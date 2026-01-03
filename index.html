@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>HabitFlow</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --accent: #38bdf8;
+            --success: #10b981;
+            --text: #f8fafc;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', -apple-system, sans-serif; }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* Progress Circle Section */
+        .dashboard {
+            text-align: center;
+            margin-bottom: 30px;
+            position: relative;
+            width: 200px;
+            height: 200px;
+        }
+
+        .progress-svg { transform: rotate(-90deg); width: 200px; height: 200px; }
+        .progress-bg { fill: none; stroke: #334155; stroke-width: 12; }
+        .progress-bar {
+            fill: none; stroke: var(--accent); stroke-width: 12;
+            stroke-linecap: round; stroke-dasharray: 565.48;
+            stroke-dashoffset: 565.48; transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .percentage {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2rem; font-weight: 800;
+        }
+
+        /* List Styling */
+        #habit-list { width: 100%; max-width: 400px; }
+
+        .habit-card {
+            background: var(--card);
+            margin-bottom: 12px;
+            padding: 18px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255,255,255,0.05);
+            animation: slideUp 0.4s ease forwards;
+        }
+
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        .habit-info h3 { font-size: 1.1rem; margin-bottom: 4px; }
+        .habit-info span { font-size: 0.8rem; color: #94a3b8; }
+
+        .check-btn {
+            width: 45px; height: 45px;
+            border-radius: 15px;
+            border: 2px solid var(--accent);
+            background: transparent;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .habit-card.completed { border-color: var(--success); opacity: 0.8; }
+        .habit-card.completed .check-btn { background: var(--success); border-color: var(--success); }
+
+        /* Floating Add Button */
+        .add-btn {
+            position: fixed; bottom: 30px; 
+            background: var(--accent);
+            color: var(--bg);
+            padding: 15px 30px;
+            border-radius: 30px;
+            font-weight: 800;
+            border: none;
+            box-shadow: 0 10px 25px rgba(56, 189, 248, 0.3);
+            cursor: pointer;
+        }
+
+        /* Simple Modal */
+        #modal {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(5px);
+            z-index: 100; align-items: center; justify-content: center;
+        }
+        .modal-content { background: var(--card); padding: 30px; border-radius: 25px; width: 90%; max-width: 350px; }
+        input {
+            width: 100%; padding: 15px; background: #0f172a; border: 1px solid #334155;
+            border-radius: 12px; color: white; margin: 15px 0; font-size: 1rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="dashboard">
+        <svg class="progress-svg">
+            <circle class="progress-bg" cx="100" cy="100" r="90"></circle>
+            <circle id="progress-bar" class="progress-bar" cx="100" cy="100" r="90"></circle>
+        </svg>
+        <div class="percentage" id="progress-text">0%</div>
+    </div>
+
+    <div id="habit-list"></div>
+
+    <button class="add-btn" onclick="toggleModal()">+ Add Habit</button>
+
+    <div id="modal">
+        <div class="modal-content">
+            <h2>New Habit</h2>
+            <input type="text" id="habit-name" placeholder="Running, Meditation...">
+            <button class="add-btn" style="position: static; width: 100%;" onclick="addHabit()">Create Habit</button>
+            <p style="text-align: center; margin-top: 15px; color: #64748b; cursor: pointer;" onclick="toggleModal()">Cancel</p>
+        </div>
+    </div>
+
+    <script>
+        let habits = JSON.parse(localStorage.getItem('habits')) || [];
+        const lastReset = localStorage.getItem('lastReset');
+        
+        // Reset habits if it's a new day
+        const today = new Date().toDateString();
+        if (lastReset !== today) {
+            habits.forEach(h => h.completed = false);
+            localStorage.setItem('lastReset', today);
+            save();
+        }
+
+        function toggleModal() {
+            const m = document.getElementById('modal');
+            m.style.display = (m.style.display === 'flex') ? 'none' : 'flex';
+        }
+
+        function addHabit() {
+            const name = document.getElementById('habit-name').value;
+            if (!name) return;
+            habits.push({ name, completed: false, streak: 0 });
+            document.getElementById('habit-name').value = '';
+            save();
+            render();
+            toggleModal();
+        }
+
+        function toggleHabit(index) {
+            habits[index].completed = !habits[index].completed;
+            if(habits[index].completed) habits[index].streak++;
+            else habits[index].streak = Math.max(0, habits[index].streak - 1);
+            save();
+            render();
+        }
+
+        function save() {
+            localStorage.setItem('habits', JSON.stringify(habits));
+        }
+
+        function render() {
+            const list = document.getElementById('habit-list');
+            list.innerHTML = '';
+            
+            let completedCount = 0;
+            habits.forEach((habit, i) => {
+                if (habit.completed) completedCount++;
+                
+                const card = document.createElement('div');
+                card.className = `habit-card ${habit.completed ? 'completed' : ''}`;
+                card.innerHTML = `
+                    <div class="habit-info">
+                        <h3>${habit.name}</h3>
+                        <span>🔥 Streak: ${habit.streak} days</span>
+                    </div>
+                    <button class="check-btn" onclick="toggleHabit(${i})">
+                        ${habit.completed ? '✔' : ''}
+                    </button>
+                `;
+                list.appendChild(card);
+            });
+
+            // Update Progress Circle
+            const percent = habits.length ? Math.round((completedCount / habits.length) * 100) : 0;
+            const offset = 565.48 - (565.48 * percent / 100);
+            document.getElementById('progress-bar').style.strokeDashoffset = offset;
+            document.getElementById('progress-text').innerText = percent + '%';
+        }
+
+        render();
+    </script>
+</body>
+</html>
